@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Client Alice (Phase 2)" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="tictactoe.client.GameClient" />
+    <module name="tictactoe-jsonrpc" />
+    <option name="PROGRAM_PARAMETERS" value="localhost 5000 Alice" />
+    <option name="VM_PARAMETERS" value="" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
