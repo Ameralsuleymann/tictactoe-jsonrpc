@@ -7,6 +7,7 @@ import tictactoe.game.Game;
 import tictactoe.model.*;
 import tictactoe.rpc.*;
 import tictactoe.ui.ConsoleListener;
+import tictactoe.ui.MoveInput;
 
 /**
  * Thin Client: keine Spiellogik, nur Anzeige (ConsoleListener als Callback) und Eingabe.
@@ -28,7 +29,7 @@ public class GameClient {
         try { me = game.join(new Player(name)); }
         catch (GameException e) { System.out.println("Beitritt abgelehnt: " + e.getMessage()); return; }
         System.out.println("Du bist " + me);
-        System.out.println("Eingabe: 'zeile spalte' (z.B. 1 1) | reset | bench | q");
+        System.out.println("Eingabe: 'zeile spalte' (z.B. 1 1 oder 11) | reset | bench | q");
 
         Scanner in = new Scanner(System.in);
         while (in.hasNextLine()) {
@@ -38,8 +39,9 @@ public class GameClient {
                 if (line.equals("reset")) game.reset();
                 else if (line.equals("bench")) benchmark(game);
                 else {
-                    String[] p = line.split("\\s+");
-                    game.makeMove(new Move(me, Integer.parseInt(p[0]), Integer.parseInt(p[1])));
+                    int[] rc = MoveInput.parse(line);
+                    if (rc == null) System.out.println("Ungueltige Eingabe - " + MoveInput.HINT);
+                    else game.makeMove(new Move(me, rc[0], rc[1]));
                 }
             } catch (GameException e) {
                 System.out.println("Server-Fehler (GameException): " + e.getMessage());   // Exception ueber RPC

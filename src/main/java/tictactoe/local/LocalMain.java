@@ -5,6 +5,7 @@ import tictactoe.api.GameException;
 import tictactoe.game.Game;
 import tictactoe.model.*;
 import tictactoe.ui.ConsoleListener;
+import tictactoe.ui.MoveInput;
 
 /** Nicht verteilte Version: gleiche Klassen (Game, DTOs, ConsoleListener), kein Netzwerk. */
 public class LocalMain {
@@ -18,13 +19,15 @@ public class LocalMain {
         while (game.getState().getStatus() == Status.RUNNING && in.hasNextLine()) {
             GameState s = game.getState();
             System.out.print(s.currentPlayer().getName() + " (zeile spalte): ");
+            int[] rc = MoveInput.parse(in.nextLine());
+            if (rc == null) {
+                System.out.println("Ungueltige Eingabe - " + MoveInput.HINT);
+                continue;
+            }
             try {
-                String[] p = in.nextLine().trim().split("\\s+");
-                game.makeMove(new Move(s.currentPlayer(), Integer.parseInt(p[0]), Integer.parseInt(p[1])));
+                game.makeMove(new Move(s.currentPlayer(), rc[0], rc[1]));
             } catch (GameException e) {
                 System.out.println("Fehler: " + e.getMessage());
-            } catch (RuntimeException e) {
-                System.out.println("Ungueltige Eingabe.");
             }
         }
     }
