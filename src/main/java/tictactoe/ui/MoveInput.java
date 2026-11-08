@@ -1,9 +1,10 @@
 package tictactoe.ui;
 
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Liest einen Zug tolerant ein: "1 2", "12", "1,2", "1;2" -> {zeile, spalte}. */
+/** Konsoleneingabe: Zug tolerant lesen ("1 2", "12", "1,2", "1;2") und Befehle (neu, q) erkennen. */
 public final class MoveInput {
     public static final String HINT = "Zeile und Spalte (0-2), z.B. 1 1 oder 11";
 
@@ -23,5 +24,17 @@ public final class MoveInput {
         } catch (NumberFormatException e) {
             return null; // Zahl zu gross
         }
+    }
+
+    /** Neustart der laufenden Runde bzw. neue Runde nach Spielende. */
+    public static boolean isRestart(String line) { return isOneOf(line, "neu", "neustart", "weiter", "reset"); }
+
+    public static boolean isQuit(String line) { return isOneOf(line, "q", "quit", "exit", "ende"); }
+
+    private static boolean isOneOf(String line, String... words) {
+        if (line == null) return false;
+        String w = line.trim().toLowerCase(Locale.ROOT);
+        for (String c : words) if (c.equals(w)) return true;
+        return false;
     }
 }

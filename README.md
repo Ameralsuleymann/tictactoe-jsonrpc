@@ -12,7 +12,8 @@ Java 25 (LTS), Maven, Gson. Das Projekt entsteht in zwei Phasen (siehe Git-Tags)
 ## Phase 1: lokale Anwendung
 
 Start in IntelliJ: Run-Konfiguration **Lokal (Phase 1)** oder `tictactoe.local.LocalMain`.
-Zwei Spieler (Alice = X, Bob = O) spielen abwechselnd an einer Konsole. Eingabe: `zeile spalte`, z. B. `1 1`.
+Zwei Spieler (Alice = X, Bob = O) spielen abwechselnd an einer Konsole. Eingabe: `zeile spalte`, z. B. `1 1` oder `11`.
+`neu` startet die Runde neu bzw. nach Spielende eine neue Runde, `q` beendet.
 
 | Paket | Klasse | Rolle |
 |---|---|---|
@@ -34,16 +35,24 @@ in Phase 2 zusaetzlich **Proxy** (Stubs).
 ### Starten
 In IntelliJ: zuerst **Server (Phase 2)**, dann **Client Alice (Phase 2)** und **Client Bob (Phase 2)**.
 
-Auf zwei Rechnern (z. B. ueber Hotspot):
-1. Server-Rechner: IP ermitteln (`ipconfig`), Port 5000 in der Windows-Firewall erlauben, **Server** starten.
-2. Client-Rechner: Run-Konfiguration bearbeiten, Programmargumente `<server-ip> 5000 Bob`.
+Auf zwei Rechnern (z. B. ueber Hotspot oder Hamachi):
+1. Server-Rechner: Port 5000 in der Windows-Firewall erlauben, **Server** starten.
+   Der Server zeigt beim Start seine IPv4-Adressen an (bei Hamachi `25.x.x.x`).
+2. Client-Rechner: **Client** starten und bei `Server-IP [Enter = localhost]:` die IP des Servers eingeben
+   (optional `ip:port`). Bei einem Fehler wird mit Grund (abgelehnt, keine Antwort, Adresse unbekannt) erneut gefragt.
 
 Ohne IntelliJ: `mvn package`, dann
 ```
 java -Drpc.verbose=true -cp target/tictactoe-jsonrpc-1.0-jar-with-dependencies.jar tictactoe.server.GameServer 5000
-java -cp target/tictactoe-jsonrpc-1.0-jar-with-dependencies.jar tictactoe.client.GameClient <server-ip> 5000 Alice
+java -cp target/tictactoe-jsonrpc-1.0-jar-with-dependencies.jar tictactoe.client.GameClient [host] [port] [name]
 ```
-Client-Befehle: `zeile spalte`, `reset`, `bench`, `q`.
+`host` ist nur die Vorgabe fuer die IP-Abfrage; ohne `name` fragt der Client nach dem Namen.
+
+Client-Befehle: `zeile spalte` (oder `11`), `neu` (auch `neustart`, `weiter`, `reset`), `bench`, `q`.
+
+Der Server laeuft dauerhaft: Nach Spielende geht es mit `neu` weiter (Rundenzaehler im `GameState`).
+Trennt sich ein Client (`q` oder Verbindungsabbruch), meldet der Server den Spieler ab (`Game.leave`),
+die Runde endet und ein neuer Client kann den freien Platz uebernehmen. Doppelte Namen werden abgelehnt.
 
 ### Neue Klassen
 | Paket | Klasse | Rolle |
@@ -63,7 +72,7 @@ Tag `phase1-lokal`, Startklasse `LocalMain`. Sie enthaelt bereits alle Fachklass
 ### 2. Designentscheidung C-S-Contract
 ```java
 interface GameService  { Player join(Player); GameState makeMove(Move) throws GameException; GameState getState(); void reset(); }
-interface GameListener { void onPlayerJoined(Player); void onStateChanged(GameState); }   // Server -> Client
+interface GameListener { void onPlayerJoined(Player); void onPlayerLeft(Player); void onStateChanged(GameState); }   // Server -> Client
 ```
 - **Bidirektional:** Client ruft `game.*`, Server ruft `listener.*` ueber denselben TCP-Socket zurueck.
 - **DTOs:** Client -> Server `Player`, `Move` (enthaelt `Player`); Server -> Client `Player`, `GameState` (enthaelt `Board`, `Player`).
@@ -141,7 +150,7 @@ Nicht deklarierte Fehler, Verbindungsabbruch und Timeout (10 s) erscheinen als `
 |---|---|---|
 | Zugriffstransparenz | Ja | Aufruf ueber `GameService`, lokal `Game`, remote Stub; gleicher Aufrufcode (`bench` nutzt beides) |
 | Ortstransparenz | Teilweise | Host/Port nur beim Verbindungsaufbau, danach unsichtbar; kein Namensdienst |
-| Fehlertransparenz | Nein | Netzfehler werden als `RpcException` sichtbar, kein Retry/Reconnect |
+| Fehlertransparenz | Nein | Netzfehler werden als `RpcException` sichtbar, kein automatischer Reconnect (der Server gibt den Platz aber frei, ein Client kann neu beitreten) |
 | Nebenlaeufigkeitstransparenz | Teilweise | `Game` ist `synchronized`, Callbacks werden serialisiert abgearbeitet |
 | Leistungstransparenz | Nein | Remote-Aufrufe sind um Groessenordnungen langsamer |
 | Migrations-/Replikationstransparenz | Nein | Ein Server, keine Replikation |

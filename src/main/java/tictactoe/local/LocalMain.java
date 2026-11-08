@@ -16,10 +16,15 @@ public class LocalMain {
         game.join(new Player("Bob"));
 
         Scanner in = new Scanner(System.in);
-        while (game.getState().getStatus() == Status.RUNNING && in.hasNextLine()) {
+        while (true) {
             GameState s = game.getState();
-            System.out.print(s.currentPlayer().getName() + " (zeile spalte): ");
-            int[] rc = MoveInput.parse(in.nextLine());
+            boolean running = s.getStatus() == Status.RUNNING;
+            System.out.print(running ? s.currentPlayer().getName() + " (zeile spalte | neu | q): " : "neu | q: ");
+            if (!in.hasNextLine()) break;
+            String line = in.nextLine();
+            if (MoveInput.isQuit(line)) break;
+            if (MoveInput.isRestart(line)) { game.reset(); continue; }
+            int[] rc = MoveInput.parse(line);
             if (rc == null) {
                 System.out.println("Ungueltige Eingabe - " + MoveInput.HINT);
                 continue;

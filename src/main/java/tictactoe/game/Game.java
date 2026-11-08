@@ -13,6 +13,7 @@ public class Game implements GameService {
     private Symbol current = Symbol.X;
     private Status status = Status.WAITING;
     private Player winner;
+    private int round = 1;
     private final List<GameListener> listeners = new CopyOnWriteArrayList<>();
 
     public void addListener(GameListener l) { listeners.add(l); }
@@ -20,8 +21,11 @@ public class Game implements GameService {
 
     @Override
     public synchronized Player join(Player p) throws GameException {
+        if (p == null || p.getName() == null || p.getName().isBlank()) throw new GameException("Name fehlt");
         if (players.size() >= 2) throw new GameException("Spiel ist bereits voll");
-        Player registered = new Player(p.getName(), players.isEmpty() ? Symbol.X : Symbol.O);
+        if (find(p.getName()) != null) throw new GameException("Name '" + p.getName() + "' ist schon vergeben");
+        Symbol free = find(Symbol.X) == null ? Symbol.X : Symbol.O;    // nach leave() kann auch X frei sein
+        Player registered = new Player(p.getName(), free);
         players.add(registered);
         if (players.size() == 2) status = Status.RUNNING;
         for (GameListener l : listeners) notifySafe(() -> l.onPlayerJoined(registered), l);
@@ -29,10 +33,22 @@ public class Game implements GameService {
         return new Player(registered.getName(), registered.getSymbol());
     }
 
+    /** Spieler verlaesst das Spiel (Server: Verbindung getrennt). Laufende Runde endet, der Platz wird frei. */
+    public synchronized void leave(String name) {
+        Player p = find(name);
+        if (p == null) return;
+        players.remove(p);
+        newRound();
+        status = Status.WAITING;
+        Player left = new Player(p.getName(), p.getSymbol());
+        for (GameListener l : listeners) notifySafe(() -> l.onPlayerLeft(left), l);
+        fireState();
+    }
+
     @Override
     public synchronized GameState makeMove(Move m) throws GameException {
         if (status == Status.WAITING) throw new GameException("Warte auf zweiten Spieler");
-        if (status != Status.RUNNING) throw new GameException("Spiel ist beendet");
+        if (status != Status.RUNNING) throw new GameException("Spiel ist beendet - mit 'neu' weiterspielen");
         Player p = find(m.getPlayer().getName());
         if (p == null) throw new GameException("Unbekannter Spieler: " + m.getPlayer().getName());
         if (p.getSymbol() != current) throw new GameException("Du bist nicht am Zug");
@@ -53,15 +69,18 @@ public class Game implements GameService {
         List<Player> copy = new ArrayList<>();
         for (Player p : players) copy.add(new Player(p.getName(), p.getSymbol()));
         Player w = winner == null ? null : new Player(winner.getName(), winner.getSymbol());
-        return new GameState(board.copy(), copy, current, status, w);
+        return new GameState(board.copy(), copy, current, status, w, round);
     }
 
+    /** Neustart der laufenden Runde bzw. neue Runde nach Spielende; die Spieler bleiben angemeldet. */
     @Override
     public synchronized void reset() {
-        board = new Board(); current = Symbol.X; winner = null;
+        newRound();
         status = players.size() == 2 ? Status.RUNNING : Status.WAITING;
         fireState();
     }
+
+    private void newRound() { board = new Board(); current = Symbol.X; winner = null; round++; }
 
     private void fireState() {
         GameState s = getState();

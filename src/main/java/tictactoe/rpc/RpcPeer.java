@@ -55,7 +55,13 @@ public class RpcPeer implements Closeable {
     public <T> T proxy(String serviceName, Class<T> iface) {
         return iface.cast(Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[] { iface },
                 (proxy, method, args) -> {
-                    if (method.getDeclaringClass() == Object.class) return "Stub[" + serviceName + "]";
+                    if (method.getDeclaringClass() == Object.class) {   // lokal beantworten, nicht ans Netz schicken
+                        return switch (method.getName()) {
+                            case "equals" -> proxy == args[0];          // noetig z.B. fuer List.remove(stub)
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            default -> "Stub[" + serviceName + "]";
+                        };
+                    }
                     return invokeRemote(serviceName, method, args);
                 }));
     }
