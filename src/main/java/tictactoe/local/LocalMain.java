@@ -7,8 +7,24 @@ import tictactoe.model.*;
 import tictactoe.ui.ConsoleListener;
 import tictactoe.ui.MoveInput;
 
-/** Nicht verteilte Version: gleiche Klassen (Game, DTOs, ConsoleListener), kein Netzwerk. */
+/**
+ * Startklasse der nicht verteilten Version (Phase 1).
+ *
+ * <p>Verwendet dieselben Klassen wie die verteilte Version ({@link Game}, die DTOs aus {@link tictactoe.model} und
+ * {@link ConsoleListener}), aber ohne Netzwerk: {@code Game} wird direkt aufgerufen und der {@code ConsoleListener}
+ * direkt als Beobachter angemeldet. Zwei Spieler (Alice = X, Bob = O) spielen abwechselnd an einer Konsole.
+ */
 public class LocalMain {
+    /** Standardkonstruktor; die lokale Version wird ueber {@link #main(String[])} gestartet. */
+    public LocalMain() { }
+
+    /**
+     * Meldet Alice und Bob an und liest anschliessend Zuege und Befehle ({@code neu}, {@code q}) von der Konsole.
+     * Fachliche Fehler ({@link GameException}) werden angezeigt, das Spiel laeuft weiter.
+     *
+     * @param args wird nicht ausgewertet
+     * @throws Exception bei unerwarteten Fehlern, z.B. wenn die Anmeldung der beiden Spieler scheitert
+     */
     public static void main(String[] args) throws Exception {
         Game game = new Game();
         game.addListener(new ConsoleListener());

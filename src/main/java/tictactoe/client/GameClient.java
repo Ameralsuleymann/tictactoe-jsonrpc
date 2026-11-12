@@ -11,17 +11,46 @@ import tictactoe.ui.ConsoleListener;
 import tictactoe.ui.MoveInput;
 
 /**
- * Thin Client: keine Spiellogik, nur Anzeige (ConsoleListener als Callback) und Eingabe.
- * Start: java -cp ... tictactoe.client.GameClient [host] [port] [name]
- * Die Server-IP wird beim Start abgefragt (Enter = host aus den Argumenten bzw. localhost), der Name nur ohne Argument.
+ * Startklasse des Thin Clients der verteilten Version (Phase 2).
+ *
+ * <p>Der Client enthaelt keine Spiellogik, nur Anzeige und Eingabe: Er liest Befehle von der Konsole, ruft das
+ * Spiel ueber einen {@link GameService}-Stub auf (Client &rarr; Server) und zeigt Zustandsaenderungen ueber einen
+ * {@link ConsoleListener} an, den der Server per Callback aufruft (Server &rarr; Client). Beide Richtungen laufen
+ * ueber dieselbe TCP-Verbindung und denselben {@link RpcPeer}.
+ *
+ * <p>Start: {@code java -cp ... tictactoe.client.GameClient [host] [port] [name]}<br>
+ * Die Server-IP wird beim Start abgefragt (Enter = {@code host} aus den Argumenten bzw. {@code localhost}),
+ * der Name nur, wenn er nicht als Argument angegeben ist.
+ *
+ * <p>Befehle: {@code zeile spalte} (z.B. {@code 1 1} oder {@code 11}), {@code neu} (Neustart bzw. neue Runde),
+ * {@code bench} (Zeitvergleich lokal/remote), {@code q} (beenden).
  */
 public class GameClient {
+    /** Timeout fuer den Verbindungsaufbau zum Server in Millisekunden. */
     private static final int CONNECT_TIMEOUT_MS = 5000;
+    /** Hilfetext mit allen Befehlen; wird nach dem Beitritt und bei ungueltiger Eingabe angezeigt. */
     private static final String HELP =
             "Befehle: 'zeile spalte' (z.B. 1 1 oder 11) | neu = Neustart / neue Runde | bench | q = beenden";
 
+    /**
+     * Wird vor dem gewollten Beenden gesetzt, damit der {@code onClose}-Handler des {@link RpcPeer} das Schliessen
+     * der Verbindung nicht als Verbindungsverlust meldet.
+     */
     private static volatile boolean quitting;   // eigenes Beenden ist kein "Verbindung verloren"
 
+    /** Standardkonstruktor; der Client wird ueber {@link #main(String[])} gestartet. */
+    public GameClient() { }
+
+    /**
+     * Startet den Client: Name und Server-Adresse abfragen, verbinden, den {@link ConsoleListener} als Dienst
+     * {@code "listener"} registrieren, dem Spiel beitreten und anschliessend die Eingabeschleife ausfuehren.
+     *
+     * <p>{@link GameException} (fachlicher Fehler, vom Server uebertragen) und {@link RpcException} (technischer
+     * Fehler) werden gefangen und angezeigt, damit der Client weiterlaeuft.
+     *
+     * @param args optional {@code [host] [port] [name]}; {@code host} ist nur die Vorgabe fuer die IP-Abfrage
+     * @throws Exception bei nicht behandelten Ein-/Ausgabefehlern
+     */
     public static void main(String[] args) throws Exception {
         String defaultHost = args.length > 0 ? args[0] : "localhost";
         int defaultPort = args.length > 1 ? Integer.parseInt(args[1]) : 5000;
@@ -70,19 +99,41 @@ public class GameClient {
         quit(peer);
     }
 
+    /**
+     * Beendet den Client geordnet: Verbindung schliessen (der Server gibt daraufhin den Platz frei) und JVM beenden.
+     *
+     * @param peer der zu schliessende RPC-Endpunkt
+     * @throws IOException wenn das Schliessen des Sockets fehlschlaegt
+     */
     private static void quit(RpcPeer peer) throws IOException {
         quitting = true;
         peer.close();      // Server merkt den Abbruch und gibt den Platz frei
         System.exit(0);
     }
 
+    /**
+     * Fragt einen Wert auf der Konsole ab und liefert bei leerer Eingabe den Vorgabewert.
+     *
+     * @param in       Konsoleneingabe
+     * @param question angezeigte Frage
+     * @param def      Vorgabewert bei leerer Eingabe
+     * @return die eingegebene (getrimmte) Antwort oder {@code def}
+     */
     private static String ask(Scanner in, String question, String def) {
         System.out.print(question + " [Enter = " + def + "]: ");
         String s = in.hasNextLine() ? in.nextLine().trim() : "";
         return s.isEmpty() ? def : s;
     }
 
-    /** Fragt die Server-Adresse ab ("ip" oder "ip:port") und verbindet. Bei Fehler erneut fragen; null = Abbruch. */
+    /**
+     * Fragt die Server-Adresse ab ({@code ip} oder {@code ip:port}) und baut die TCP-Verbindung auf.
+     * Schlaegt der Verbindungsaufbau fehl, wird der Grund angezeigt und erneut gefragt.
+     *
+     * @param in          Konsoleneingabe
+     * @param defaultHost Host bei leerer Eingabe
+     * @param defaultPort Port, falls in der Eingabe keiner angegeben ist
+     * @return der verbundene Socket oder {@code null}, wenn mit {@code q} abgebrochen wird oder die Eingabe endet
+     */
     private static Socket connect(Scanner in, String defaultHost, int defaultPort) {
         while (true) {
             System.out.print("Server-IP [Enter = " + defaultHost + "]: ");
@@ -112,6 +163,13 @@ public class GameClient {
         }
     }
 
+    /**
+     * Uebersetzt eine Exception beim Verbindungsaufbau in einen verstaendlichen Grund.
+     *
+     * @param e    die beim Verbinden aufgetretene Exception
+     * @param port der verwendete Port (fuer den Hinweis bei abgelehnter Verbindung)
+     * @return kurze Fehlerbeschreibung fuer die Konsole
+     */
     private static String reason(IOException e, int port) {
         if (e instanceof UnknownHostException) return "Adresse unbekannt";
         if (e instanceof SocketTimeoutException) return "keine Antwort (IP falsch oder Firewall blockiert)";
@@ -120,7 +178,13 @@ public class GameClient {
         return e.getMessage();
     }
 
-    /** Vergleich: lokaler Aufruf (Game im selben Prozess) vs. entfernter RPC-Aufruf, jeweils getState(). */
+    /**
+     * Vergleicht die Dauer eines lokalen Aufrufs ({@link Game} im selben Prozess) mit der eines entfernten
+     * RPC-Aufrufs, jeweils {@link GameService#getState()}, und gibt beide Zeiten sowie den Faktor aus.
+     * Vor der Messung laeuft ein Warm-up, damit der JIT-Compiler den Code bereits optimiert hat.
+     *
+     * @param remote der {@link GameService}-Stub zum Server
+     */
     private static void benchmark(GameService remote) {
         GameService local = new Game();
         int n = 2000;
@@ -129,6 +193,13 @@ public class GameClient {
         System.out.printf("Lokal : %.3f us/Aufruf%nRemote: %.3f us/Aufruf%nFaktor : %.0fx langsamer%n", l, r, r / l);
     }
 
+    /**
+     * Misst die mittlere Dauer von {@link GameService#getState()}.
+     *
+     * @param s die aufzurufende Implementierung (lokal oder Stub)
+     * @param n Anzahl der Aufrufe
+     * @return mittlere Dauer pro Aufruf in Mikrosekunden
+     */
     private static double measure(GameService s, int n) {
         long t = System.nanoTime();
         for (int i = 0; i < n; i++) s.getState();

@@ -7,10 +7,26 @@ import tictactoe.game.Game;
 import tictactoe.rpc.RpcPeer;
 
 /**
- * Start: java -cp ... tictactoe.server.GameServer [port]   (-Drpc.verbose=true zeigt die JSON-Nachrichten)
- * Laeuft dauerhaft: nach Spielende geht es mit 'neu' weiter, getrennte Clients geben ihren Platz frei.
+ * Startklasse des Servers der verteilten Version (Phase 2).
+ *
+ * <p>Lauscht auf einem TCP-Port und erzeugt fuer jeden verbundenen Client einen eigenen {@link RpcPeer} mit einer
+ * {@link GameSession}, die als Dienst {@code "game"} registriert wird. Alle Sessions teilen sich eine
+ * {@link Game}-Instanz.
+ *
+ * <p>Start: {@code java -cp ... tictactoe.server.GameServer [port]}; mit {@code -Drpc.verbose=true} werden die
+ * JSON-Nachrichten angezeigt.<br>
+ * Laeuft dauerhaft: nach Spielende geht es mit {@code neu} weiter, getrennte Clients geben ihren Platz frei.
  */
 public class GameServer {
+    /** Standardkonstruktor; der Server wird ueber {@link #main(String[])} gestartet. */
+    public GameServer() { }
+
+    /**
+     * Startet den Server, gibt seine erreichbaren Adressen aus und nimmt in einer Endlosschleife Verbindungen an.
+     *
+     * @param args optional {@code [port]}, Standard ist {@code 5000}
+     * @throws Exception wenn der Port nicht geoeffnet werden kann oder ein Ein-/Ausgabefehler auftritt
+     */
     public static void main(String[] args) throws Exception {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 5000;
         boolean verbose = Boolean.getBoolean("rpc.verbose");
@@ -28,7 +44,10 @@ public class GameServer {
         }
     }
 
-    /** IPv4-Adressen dieses Rechners, die Clients bei "Server-IP" eingeben koennen (z.B. Hamachi 25.x.x.x). */
+    /**
+     * Gibt die IPv4-Adressen dieses Rechners aus, die Clients bei "Server-IP" eingeben koennen.
+     * Beruecksichtigt werden alle aktiven Netzwerkschnittstellen ohne Loopback, z.B. Hamachi mit {@code 25.x.x.x}.
+     */
     private static void printAddresses() {
         try {
             System.out.println("Erreichbar unter:");
