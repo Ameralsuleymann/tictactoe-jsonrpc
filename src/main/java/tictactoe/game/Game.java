@@ -14,11 +14,14 @@ import tictactoe.model.*;
  * teilen. Regeln, Zugreihenfolge und Gewinnpruefung liegen ausschliesslich hier (Thin Client).
  *
  * <p>Alle oeffentlichen Spielmethoden sind {@code synchronized}, da auf dem Server mehrere Sessions gleichzeitig
- * zugreifen. Nach jeder Aenderung werden die registrierten {@link GameListener} benachrichtigt. Nach aussen werden
- * nur Kopien des internen Zustands herausgegeben.
+ * zugreifen. Nach jeder Aenderung werden die registrierten {@link GameListener} benachrichtigt.
+ *
+ * <p>Da alle DTOs unveraenderlich sind ({@link Board}, {@link Player}, {@link GameState}), kann {@code Game} sie ohne
+ * Kopien herausgeben: Niemand kann den internen Zustand ueber ein herausgegebenes Objekt veraendern. Ein Zug ersetzt
+ * das Spielfeld durch ein neues ({@link Board#with(int, int, Symbol)}).
  */
 public class Game implements GameService {
-    /** Aktuelles Spielfeld; wird bei jeder neuen Runde ersetzt. */
+    /** Aktuelles Spielfeld (unveraenderlich); wird bei jedem Zug und jeder neuen Runde durch ein neues ersetzt. */
     private Board board = new Board();
     /** Angemeldete Spieler (hoechstens zwei). */
     private final List<Player> players = new ArrayList<>();
@@ -61,21 +64,21 @@ public class Game implements GameService {
      * {@link GameListener#onPlayerJoined(Player)} und {@link GameListener#onStateChanged(GameState)}.
      *
      * @param p anzumeldender Spieler; ausgewertet wird nur der Name
-     * @return Kopie des angemeldeten Spielers mit zugewiesenem Symbol
+     * @return neuer, unveraenderlicher Spieler mit zugewiesenem Symbol
      * @throws GameException wenn der Name fehlt oder schon vergeben ist oder das Spiel bereits voll ist
      */
     @Override
     public synchronized Player join(Player p) throws GameException {
-        if (p == null || p.getName() == null || p.getName().isBlank()) throw new GameException("Name fehlt");
+        if (p == null || p.name() == null || p.name().isBlank()) throw new GameException("Name fehlt");
         if (players.size() >= 2) throw new GameException("Spiel ist bereits voll");
-        if (find(p.getName()) != null) throw new GameException("Name '" + p.getName() + "' ist schon vergeben");
+        if (find(p.name()) != null) throw new GameException("Name '" + p.name() + "' ist schon vergeben");
         Symbol free = find(Symbol.X) == null ? Symbol.X : Symbol.O;    // nach leave() kann auch X frei sein
-        Player registered = new Player(p.getName(), free);
+        Player registered = new Player(p.name(), free);                  // Symbol vergeben = neuer Player
         players.add(registered);
         if (players.size() == 2) status = Status.RUNNING;
         for (GameListener l : listeners) notifySafe(() -> l.onPlayerJoined(registered), l);
         fireState();
-        return new Player(registered.getName(), registered.getSymbol());
+        return registered;
     }
 
     /**
@@ -92,8 +95,7 @@ public class Game implements GameService {
         players.remove(p);
         newRound();
         status = Status.WAITING;
-        Player left = new Player(p.getName(), p.getSymbol());
-        for (GameListener l : listeners) notifySafe(() -> l.onPlayerLeft(left), l);
+        for (GameListener l : listeners) notifySafe(() -> l.onPlayerLeft(p), l);
         fireState();
     }
 
@@ -101,8 +103,9 @@ public class Game implements GameService {
      * {@inheritDoc}
      *
      * <p>Geprueft wird der Reihe nach: Spiel laeuft, Spieler ist bekannt und am Zug, Feld liegt im Spielfeld und ist
-     * frei. Danach wird das Symbol gesetzt und auf Gewinn oder Unentschieden geprueft; andernfalls wechselt das
-     * Zugrecht zum anderen Spieler. Alle Beobachter erhalten den neuen Zustand.
+     * frei. Danach ersetzt ein neues Spielfeld mit dem gesetzten Symbol das alte, und es wird auf Gewinn oder
+     * Unentschieden geprueft; andernfalls wechselt das Zugrecht zum anderen Spieler. Alle Beobachter erhalten den
+     * neuen Zustand.
      *
      * @param m der Zug
      * @return Spielzustand nach dem Zug
@@ -112,13 +115,13 @@ public class Game implements GameService {
     public synchronized GameState makeMove(Move m) throws GameException {
         if (status == Status.WAITING) throw new GameException("Warte auf zweiten Spieler");
         if (status != Status.RUNNING) throw new GameException("Spiel ist beendet - mit 'neu' weiterspielen");
-        Player p = find(m.getPlayer().getName());
-        if (p == null) throw new GameException("Unbekannter Spieler: " + m.getPlayer().getName());
-        if (p.getSymbol() != current) throw new GameException("Du bist nicht am Zug");
-        if (!board.inBounds(m.getRow(), m.getCol())) throw new GameException("Feld ausserhalb des Spielfelds");
-        if (board.get(m.getRow(), m.getCol()) != Symbol.EMPTY) throw new GameException("Feld ist bereits belegt");
+        Player p = find(m.player().name());
+        if (p == null) throw new GameException("Unbekannter Spieler: " + m.player().name());
+        if (p.symbol() != current) throw new GameException("Du bist nicht am Zug");
+        if (!board.inBounds(m.row(), m.col())) throw new GameException("Feld ausserhalb des Spielfelds");
+        if (board.get(m.row(), m.col()) != Symbol.EMPTY) throw new GameException("Feld ist bereits belegt");
 
-        board.set(m.getRow(), m.getCol(), p.getSymbol());
+        board = board.with(m.row(), m.col(), p.symbol());   // neues, unveraenderliches Spielfeld
         Symbol w = board.winner();
         if (w != null) { status = Status.WON; winner = find(w); }
         else if (board.isFull()) status = Status.DRAW;
@@ -130,17 +133,14 @@ public class Game implements GameService {
     /**
      * {@inheritDoc}
      *
-     * <p>Spielfeld, Spielerliste und Gewinner werden kopiert, damit Aufrufer den internen Zustand nicht veraendern
-     * koennen. Lokal entspricht das damit der Wertuebergabe bei RPC.
+     * <p>Spielfeld und Spieler sind unveraenderlich und werden deshalb nicht kopiert; nur die Spielerliste uebernimmt
+     * {@link GameState} als unveraenderliche Kopie. Aufrufer koennen den internen Zustand so nicht veraendern.
      *
-     * @return Kopie des aktuellen Zustands
+     * @return unveraenderlicher Schnappschuss des aktuellen Zustands
      */
     @Override
     public synchronized GameState getState() {
-        List<Player> copy = new ArrayList<>();
-        for (Player p : players) copy.add(new Player(p.getName(), p.getSymbol()));
-        Player w = winner == null ? null : new Player(winner.getName(), winner.getSymbol());
-        return new GameState(board.copy(), copy, current, status, w, round);
+        return new GameState(board, players, current, status, winner, round);
     }
 
     /**
@@ -187,7 +187,7 @@ public class Game implements GameService {
      * @param name gesuchter Name
      * @return der Spieler oder {@code null}, wenn kein Spieler so heisst
      */
-    private Player find(String name) { for (Player p : players) if (p.getName().equals(name)) return p; return null; }
+    private Player find(String name) { for (Player p : players) if (p.name().equals(name)) return p; return null; }
 
     /**
      * Sucht einen angemeldeten Spieler anhand seines Symbols.
@@ -195,5 +195,5 @@ public class Game implements GameService {
      * @param s gesuchtes Symbol
      * @return der Spieler oder {@code null}, wenn kein Spieler dieses Symbol hat
      */
-    private Player find(Symbol s) { for (Player p : players) if (p.getSymbol() == s) return p; return null; }
+    private Player find(Symbol s) { for (Player p : players) if (p.symbol() == s) return p; return null; }
 }

@@ -81,7 +81,7 @@ public class GameSession implements GameService {
         if (listenerStub != null) game.removeListener(listenerStub);
         if (player == null) return;
         System.out.println("Verbindung getrennt: " + player + " - Platz ist wieder frei.");
-        game.leave(player.getName());
+        game.leave(player.name());
         player = null;
     }
 }

@@ -6,7 +6,7 @@ package tictactoe.model;
 public enum Status {
     /** Es sind noch nicht zwei Spieler angemeldet; Zuege sind nicht moeglich. */
     WAITING,
-    /** Die Runde laeuft; der Spieler mit {@link GameState#getCurrent()} ist am Zug. */
+    /** Die Runde laeuft; der Spieler mit {@link GameState#current()} ist am Zug. */
     RUNNING,
     /** Die Runde ist mit einem Gewinner beendet. */
     WON,

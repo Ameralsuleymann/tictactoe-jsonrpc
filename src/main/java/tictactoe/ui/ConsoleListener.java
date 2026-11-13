@@ -41,18 +41,18 @@ public class ConsoleListener implements GameListener {
      */
     @Override public void onStateChanged(GameState s) {
         System.out.println();
-        if (s.getStatus() == Status.RUNNING && s.getRound() != shownRound) {
-            shownRound = s.getRound();
+        if (s.status() == Status.RUNNING && s.round() != shownRound) {
+            shownRound = s.round();
             System.out.println("===== Runde " + shownRound + " =====");
         }
-        System.out.print(s.getBoard());
-        switch (s.getStatus()) {
+        System.out.print(s.board());
+        switch (s.status()) {
             case WAITING -> System.out.println("Warte auf zweiten Spieler ...");
             case RUNNING -> System.out.println("Am Zug: " + s.currentPlayer());
-            case WON -> System.out.println("*** Gewinner: " + s.getWinner() + " ***");
+            case WON -> System.out.println("*** Gewinner: " + s.winner() + " ***");
             case DRAW -> System.out.println("*** Unentschieden ***");
         }
-        if (s.getStatus() == Status.WON || s.getStatus() == Status.DRAW)
+        if (s.status() == Status.WON || s.status() == Status.DRAW)
             System.out.println("Weiterspielen: 'neu'  |  Beenden: 'q'");
     }
 }

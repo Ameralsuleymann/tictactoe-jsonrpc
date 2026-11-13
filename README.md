@@ -18,7 +18,7 @@ Aufrufs (siehe Liefergegenstand 6), `q` beendet.
 
 | Paket | Klasse | Rolle |
 |---|---|---|
-| `model` | `Player`, `Move`, `GameState`, `Board`, `Symbol`, `Status` | Fachobjekte (in Phase 2 die DTOs) |
+| `model` | `Player`, `Move`, `GameState`, `Board`, `Symbol`, `Status` | Fachobjekte, unveraenderlich (Records bzw. Enums); in Phase 2 die DTOs |
 | `api` | `GameService` | Schnittstelle zum Spiel (in Phase 2 Contract Client -> Server) |
 | `api` | `GameListener` | Observer-Schnittstelle (in Phase 2 Contract Server -> Client) |
 | `api` | `GameException` | Fachlicher Fehler (ungueltiger Zug, nicht am Zug, ...) |
@@ -80,6 +80,15 @@ interface GameListener { void onPlayerJoined(Player); void onPlayerLeft(Player);
 ```
 - **Bidirektional:** Client ruft `game.*`, Server ruft `listener.*` ueber denselben TCP-Socket zurueck.
 - **DTOs:** Client -> Server `Player`, `Move` (enthaelt `Player`); Server -> Client `Player`, `GameState` (enthaelt `Board`, `Player`).
+- **Unveraenderliche DTOs:** `Player`, `Move`, `GameState` und `Board` sind Java-Records (Klasse und alle Felder `final`,
+  keine Setter, Listen unveraenderbar). Gruende:
+  - Ein DTO wird als Kopie uebertragen; eine Aenderung auf einer Seite haette auf der anderen keine Wirkung. Ohne Setter
+    ist das auch im Code klar.
+  - Unveraenderliche Objekte koennen ohne Synchronisation zwischen Reader-, Worker- und Hauptthread geteilt werden.
+  - `Game` gibt den Zustand ohne defensive Kopien heraus. Ein Zug erzeugt ein neues Spielfeld (`board.with(...)`),
+    das Symbol vergibt der Server mit einem neuen `Player`.
+  - Gson erzeugt Records ueber ihren Konstruktor; das JSON-Format ist dasselbe wie mit den frueheren Klassen.
+    `Board` prueft dabei die Groesse (3x3), ein fehlerhaftes Spielfeld aus dem Netz wird abgelehnt.
 - **Thin Client:** Regeln, Zugreihenfolge und Gewinnpruefung liegen nur im Server, der Client zeigt an.
 - **Alternativen:**
   - *Fat Client:* Client prueft Zuege vorab (spart Roundtrips), aber Regeln doppelt und Manipulation moeglich.

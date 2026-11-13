@@ -38,8 +38,8 @@ public class LocalMain {
         Scanner in = new Scanner(System.in);
         while (true) {
             GameState s = game.getState();
-            boolean running = s.getStatus() == Status.RUNNING;
-            System.out.print(running ? s.currentPlayer().getName() + " (zeile spalte | neu | bench | q): " : "neu | bench | q: ");
+            boolean running = s.status() == Status.RUNNING;
+            System.out.print(running ? s.currentPlayer().name() + " (zeile spalte | neu | bench | q): " : "neu | bench | q: ");
             if (!in.hasNextLine()) break;
             String line = in.nextLine();
             if (MoveInput.isQuit(line)) break;

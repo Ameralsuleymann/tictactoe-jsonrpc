@@ -1,56 +1,26 @@
 package tictactoe.model;
 
 /**
- * DTO: Spieler mit Name und Symbol, wird in beide Richtungen uebertragen.
+ * DTO: Spieler mit Name und Symbol, unveraenderlich (Record), wird in beide Richtungen uebertragen.
  *
  * <p>Client &rarr; Server bei {@link tictactoe.api.GameService#join(Player)} und als Teil von {@link Move};
  * Server &rarr; Client als Rueckgabewert von {@code join}, in den Callbacks von {@link tictactoe.api.GameListener}
  * und als Teil von {@link GameState}. Spieler werden ueber ihren Namen identifiziert.
+ *
+ * <p>Wie alle DTOs ist {@code Player} unveraenderlich: Uebertragen wird immer eine Kopie, eine Aenderung auf der
+ * einen Seite haette auf der anderen ohnehin keine Wirkung. Das Symbol vergibt der Server, indem er beim Beitritt
+ * einen neuen {@code Player} mit Symbol erzeugt.
+ *
+ * @param name   eindeutiger Name des Spielers
+ * @param symbol Spielstein des Spielers; {@code null}, solange der Spieler noch nicht beigetreten ist
  */
-public class Player {
-    /** Eindeutiger Name des Spielers. */
-    private String name;
-    /** Spielstein des Spielers; vor dem Beitritt {@code null}. */
-    private Symbol symbol; // wird vom Server beim join vergeben
-
-    /** Erzeugt einen leeren Spieler; wird von Gson beim Unmarshalling verwendet. */
-    public Player() { }
-
+public record Player(String name, Symbol symbol) {
     /**
      * Erzeugt einen Spieler ohne Symbol, etwa fuer die Anmeldung mit {@link tictactoe.api.GameService#join(Player)}.
      *
      * @param name Name des Spielers
      */
-    public Player(String name) { this.name = name; }
-
-    /**
-     * Erzeugt einen Spieler mit Symbol.
-     *
-     * @param name   Name des Spielers
-     * @param symbol zugewiesener Spielstein
-     */
-    public Player(String name, Symbol symbol) { this.name = name; this.symbol = symbol; }
-
-    /**
-     * Liefert den Namen des Spielers.
-     *
-     * @return Name des Spielers
-     */
-    public String getName() { return name; }
-
-    /**
-     * Liefert den Spielstein des Spielers.
-     *
-     * @return zugewiesenes Symbol oder {@code null}, solange der Spieler nicht beigetreten ist
-     */
-    public Symbol getSymbol() { return symbol; }
-
-    /**
-     * Setzt den Spielstein des Spielers.
-     *
-     * @param symbol zuzuweisendes Symbol
-     */
-    public void setSymbol(Symbol symbol) { this.symbol = symbol; }
+    public Player(String name) { this(name, null); }
 
     /**
      * Textdarstellung fuer die Konsole.
