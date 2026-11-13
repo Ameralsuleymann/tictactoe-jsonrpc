@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.*;
 import java.util.Scanner;
 import tictactoe.api.*;
-import tictactoe.game.Game;
 import tictactoe.model.*;
 import tictactoe.rpc.*;
 import tictactoe.ui.ConsoleListener;
@@ -23,14 +22,14 @@ import tictactoe.ui.MoveInput;
  * der Name nur, wenn er nicht als Argument angegeben ist.
  *
  * <p>Befehle: {@code zeile spalte} (z.B. {@code 1 1} oder {@code 11}), {@code neu} (Neustart bzw. neue Runde),
- * {@code bench} (Zeitvergleich lokal/remote), {@code q} (beenden).
+ * {@code bench [anzahl]} (Zeitvergleich lokal/remote, siehe {@link Benchmark}), {@code q} (beenden).
  */
 public class GameClient {
     /** Timeout fuer den Verbindungsaufbau zum Server in Millisekunden. */
     private static final int CONNECT_TIMEOUT_MS = 5000;
     /** Hilfetext mit allen Befehlen; wird nach dem Beitritt und bei ungueltiger Eingabe angezeigt. */
     private static final String HELP =
-            "Befehle: 'zeile spalte' (z.B. 1 1 oder 11) | neu = Neustart / neue Runde | bench | q = beenden";
+            "Befehle: 'zeile spalte' (z.B. 1 1 oder 11) | neu = Neustart / neue Runde | bench [anzahl] = Zeitvergleich | q = beenden";
 
     /**
      * Wird vor dem gewollten Beenden gesetzt, damit der {@code onClose}-Handler des {@link RpcPeer} das Schliessen
@@ -81,8 +80,9 @@ public class GameClient {
             if (line.isEmpty()) continue;
             if (MoveInput.isQuit(line)) break;
             try {
+                int benchCalls = Benchmark.parseCalls(line);
                 if (MoveInput.isRestart(line)) game.reset();
-                else if (line.equalsIgnoreCase("bench")) benchmark(game);
+                else if (benchCalls > 0) Benchmark.run(game, peer, socket.getInetAddress(), benchCalls);
                 else {
                     int[] rc = MoveInput.parse(line);
                     if (rc == null) System.out.println("Ungueltige Eingabe. " + HELP);
@@ -176,33 +176,5 @@ public class GameClient {
         if (e instanceof ConnectException && String.valueOf(e.getMessage()).contains("refused"))
             return "abgelehnt (laeuft der Server auf Port " + port + "?)";
         return e.getMessage();
-    }
-
-    /**
-     * Vergleicht die Dauer eines lokalen Aufrufs ({@link Game} im selben Prozess) mit der eines entfernten
-     * RPC-Aufrufs, jeweils {@link GameService#getState()}, und gibt beide Zeiten sowie den Faktor aus.
-     * Vor der Messung laeuft ein Warm-up, damit der JIT-Compiler den Code bereits optimiert hat.
-     *
-     * @param remote der {@link GameService}-Stub zum Server
-     */
-    private static void benchmark(GameService remote) {
-        GameService local = new Game();
-        int n = 2000;
-        measure(local, 500);  measure(remote, 100);                // Warm-up (JIT)
-        double l = measure(local, n), r = measure(remote, n);
-        System.out.printf("Lokal : %.3f us/Aufruf%nRemote: %.3f us/Aufruf%nFaktor : %.0fx langsamer%n", l, r, r / l);
-    }
-
-    /**
-     * Misst die mittlere Dauer von {@link GameService#getState()}.
-     *
-     * @param s die aufzurufende Implementierung (lokal oder Stub)
-     * @param n Anzahl der Aufrufe
-     * @return mittlere Dauer pro Aufruf in Mikrosekunden
-     */
-    private static double measure(GameService s, int n) {
-        long t = System.nanoTime();
-        for (int i = 0; i < n; i++) s.getState();
-        return (System.nanoTime() - t) / 1000.0 / n;
     }
 }

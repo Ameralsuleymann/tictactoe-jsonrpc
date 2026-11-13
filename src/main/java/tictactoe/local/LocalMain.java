@@ -2,6 +2,7 @@ package tictactoe.local;
 
 import java.util.Scanner;
 import tictactoe.api.GameException;
+import tictactoe.client.Benchmark;
 import tictactoe.game.Game;
 import tictactoe.model.*;
 import tictactoe.ui.ConsoleListener;
@@ -13,13 +14,16 @@ import tictactoe.ui.MoveInput;
  * <p>Verwendet dieselben Klassen wie die verteilte Version ({@link Game}, die DTOs aus {@link tictactoe.model} und
  * {@link ConsoleListener}), aber ohne Netzwerk: {@code Game} wird direkt aufgerufen und der {@code ConsoleListener}
  * direkt als Beobachter angemeldet. Zwei Spieler (Alice = X, Bob = O) spielen abwechselnd an einer Konsole.
+ *
+ * <p>Mit {@code bench [anzahl]} wird die Dauer eines lokalen Aufrufs gemessen ({@link Benchmark#runLocal}), als
+ * Gegenstueck zu {@code bench} im Client der verteilten Version.
  */
 public class LocalMain {
     /** Standardkonstruktor; die lokale Version wird ueber {@link #main(String[])} gestartet. */
     public LocalMain() { }
 
     /**
-     * Meldet Alice und Bob an und liest anschliessend Zuege und Befehle ({@code neu}, {@code q}) von der Konsole.
+     * Meldet Alice und Bob an und liest anschliessend Zuege und Befehle ({@code neu}, {@code bench}, {@code q}) von der Konsole.
      * Fachliche Fehler ({@link GameException}) werden angezeigt, das Spiel laeuft weiter.
      *
      * @param args wird nicht ausgewertet
@@ -35,11 +39,13 @@ public class LocalMain {
         while (true) {
             GameState s = game.getState();
             boolean running = s.getStatus() == Status.RUNNING;
-            System.out.print(running ? s.currentPlayer().getName() + " (zeile spalte | neu | q): " : "neu | q: ");
+            System.out.print(running ? s.currentPlayer().getName() + " (zeile spalte | neu | bench | q): " : "neu | bench | q: ");
             if (!in.hasNextLine()) break;
             String line = in.nextLine();
             if (MoveInput.isQuit(line)) break;
             if (MoveInput.isRestart(line)) { game.reset(); continue; }
+            int benchCalls = Benchmark.parseCalls(line);
+            if (benchCalls > 0) { Benchmark.runLocal(game, benchCalls); continue; }
             int[] rc = MoveInput.parse(line);
             if (rc == null) {
                 System.out.println("Ungueltige Eingabe - " + MoveInput.HINT);

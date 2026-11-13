@@ -27,6 +27,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Threads: Der Reader-Thread ({@code rpc-reader}) liest alle eingehenden Nachrichten, ordnet Antworten ueber ihre
  * {@code id} den wartenden Aufrufen zu und uebergibt eingehende Aufrufe an einen Worker-Thread ({@code rpc-worker}).
  *
+ * <p>Jeder Endpunkt bietet automatisch den Dienst {@code "rpc"} mit {@link Ping#ping()} an: ein leerer Aufruf ohne
+ * Spiellogik und ohne DTO, mit dem der Benchmark den Grundaufwand eines entfernten Aufrufs misst.
+ *
  * <p>Beispiel einer Anfrage:
  * <pre>{@code
  * {"jsonrpc":"2.0","method":"game.makeMove","params":[{"player":{"name":"Alice","symbol":"X"},"row":1,"col":1}],"id":3}
@@ -37,6 +40,22 @@ public class RpcPeer implements Closeable {
     private static final Gson GSON = new Gson();
     /** Maximale Wartezeit auf eine Antwort in Sekunden; danach wird eine {@link RpcException} geworfen. */
     private static final long TIMEOUT_SEC = 10;
+
+    /**
+     * Leerer Dienst, den jeder {@code RpcPeer} automatisch unter dem Namen {@code "rpc"} anbietet.
+     *
+     * <p>Ein Aufruf nimmt denselben Weg wie jeder andere RPC-Aufruf (Stub, JSON, TCP, Reader- und Worker-Thread,
+     * Reflection), aber ohne Spiellogik und fast ohne Daten. Seine Dauer ist daher der Grundaufwand eines entfernten
+     * Aufrufs; der Benchmark ({@code tictactoe.client.Benchmark}) misst ihn als Transportanteil.
+     */
+    public interface Ping {
+        /**
+         * Leerer Roundtrip zur Gegenseite.
+         *
+         * @return immer {@code "pong"}
+         */
+        String ping();
+    }
 
     /**
      * Unter einem Dienstnamen registrierte Implementierung.
@@ -54,7 +73,7 @@ public class RpcPeer implements Closeable {
     private final PrintWriter out;
     /** Wenn {@code true}, werden alle gesendeten und empfangenen Nachrichten auf der Konsole ausgegeben. */
     private final boolean verbose;
-    /** Angebotene Dienste: Dienstname ({@code game} bzw. {@code listener}) &rarr; Registrierung. */
+    /** Angebotene Dienste: Dienstname ({@code game}, {@code listener} oder {@code rpc}) &rarr; Registrierung. */
     private final Map<String, Registration> services = new ConcurrentHashMap<>();
     /** Offene Aufrufe: Anfrage-{@code id} &rarr; Future, das der Reader-Thread mit der Antwort erfuellt. */
     private final Map<Long, CompletableFuture<JsonObject>> pending = new ConcurrentHashMap<>();
@@ -72,6 +91,7 @@ public class RpcPeer implements Closeable {
 
     /**
      * Erzeugt einen Endpunkt fuer eine bereits aufgebaute Verbindung; gelesen wird erst nach {@link #start()}.
+     * Der leere Dienst {@code "rpc"} ({@link Ping}) wird dabei automatisch registriert.
      *
      * @param socket  verbundener Socket (Client- oder Serverseite)
      * @param verbose {@code true}, um alle JSON-Nachrichten auf der Konsole auszugeben
@@ -82,6 +102,7 @@ public class RpcPeer implements Closeable {
         this.verbose = verbose;
         this.in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         this.out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+        services.put("rpc", new Registration(Ping.class, (Ping) () -> "pong"));   // leerer Dienst fuer den Benchmark
     }
 
     /**
@@ -344,6 +365,25 @@ public class RpcPeer implements Closeable {
             out.println(line);
             if (out.checkError()) throw new RpcException("Senden fehlgeschlagen (Verbindung weg)");
         }
+    }
+
+    // ---------------------------------------------------------------- Messhilfe (Benchmark)
+
+    /**
+     * Marshalling und Unmarshalling eines Objekts ohne Netz, so wie bei einem RPC-Aufruf: Java &rarr; JSON &rarr; Java.
+     *
+     * <p>Entspricht der Arbeit von Gson bei einem Rueckgabewert: Der Server wandelt das Objekt in JSON-Text um, der
+     * Client-Stub parst den Text und erzeugt daraus wieder ein Objekt. Der Benchmark misst damit den Anteil des
+     * Marshallings an der Dauer eines Remote-Aufrufs.
+     *
+     * @param value zu uebertragendes Objekt, z.B. ein {@link tictactoe.model.GameState}
+     * @param type  Klasse des Objekts
+     * @param <T>   Typ des Objekts
+     * @return neu erzeugte Kopie nach dem Weg durch JSON
+     */
+    public static <T> T marshalRoundTrip(T value, Class<T> type) {
+        String json = GSON.toJson(GSON.toJsonTree(value, type));    // Marshalling (wie der Server beim Ergebnis)
+        return GSON.fromJson(JsonParser.parseString(json), type);   // Unmarshalling (wie der Client-Stub)
     }
 
     /**
