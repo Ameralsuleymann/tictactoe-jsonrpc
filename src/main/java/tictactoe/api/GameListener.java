@@ -1,38 +1,22 @@
 package tictactoe.api;
 
 import tictactoe.model.GameState;
-import tictactoe.model.Player;
 
 /**
- * Observer-Schnittstelle fuer Spielereignisse; in der verteilten Version der C-S-Contract in Richtung
- * Server &rarr; Client (Callback).
+ * Contract Server &rarr; Client (Callback): Observer-Pattern in der Push-Variante.
  *
- * <p>Lokal meldet sich ein Listener direkt bei {@link tictactoe.game.Game#addListener(GameListener)} an.
- * Verteilt registriert der Client seine Implementierung ({@link tictactoe.ui.ConsoleListener}) unter dem
- * Dienstnamen {@code "listener"} bei seinem {@link tictactoe.rpc.RpcPeer}; der Server erhaelt dafuer einen Stub.
- *
- * <p>Alle Methoden haben den Rueckgabetyp {@code void} und werden deshalb als JSON-RPC-Notification
- * (ohne {@code id}, ohne Antwort, fire-and-forget) uebertragen.
+ * <p>Implementierungen:
+ * <ul>
+ *   <li>{@link tictactoe.ui.ConsoleListener}: zeigt den Zustand auf der Konsole an,</li>
+ *   <li>{@link tictactoe.rpc.GameListenerStub}: serverseitiger Stub, schickt den Zustand zum Client.</li>
+ * </ul>
+ * Die Methode ist {@code void} und wird deshalb als JSON-RPC-Notification ohne Antwort übertragen.
  */
 public interface GameListener {
     /**
-     * Wird aufgerufen, nachdem ein Spieler erfolgreich beigetreten ist.
+     * Wird nach jeder Zustandsänderung aufgerufen (Beitritt, Zug, Neustart, Abmeldung).
      *
-     * @param player der beigetretene Spieler inklusive zugewiesenem {@link tictactoe.model.Symbol}
-     */
-    void onPlayerJoined(Player player);
-
-    /**
-     * Wird aufgerufen, nachdem ein Spieler das Spiel verlassen hat (auf dem Server: Verbindung getrennt).
-     *
-     * @param player der Spieler, der das Spiel verlassen hat
-     */
-    void onPlayerLeft(Player player);
-
-    /**
-     * Wird nach jeder Zustandsaenderung aufgerufen (Beitritt, Zug, Neustart, Abmeldung).
-     *
-     * @param state Kopie des vollstaendigen, aktuellen Spielzustands
+     * @param state der vollständige neue Spielzustand
      */
     void onStateChanged(GameState state);
 }

@@ -5,27 +5,24 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * DTO: 3x3-Spielfeld, unveraenderlich (Record), Bestandteil von {@link GameState}.
+ * DTO: 3x3-Spielfeld, unveränderlich (Record), Teil von {@link GameState}.
  *
- * <p>Zeilen und Spalten werden von 0 bis 2 gezaehlt. Ein Zug veraendert das Spielfeld nicht, sondern
- * {@link #with(int, int, Symbol)} liefert ein neues Spielfeld; {@link tictactoe.game.Game} ersetzt damit sein
- * aktuelles Spielfeld. Gson serialisiert {@code cells} wie bisher als verschachteltes JSON-Array aus Symbolnamen.
- * Neben den Daten enthaelt die Klasse einfache Hilfsmethoden fuer die Spiellogik (Gewinn- und Vollpruefung) und die
- * Konsolenausgabe.
+ * <p>Zeilen und Spalten zählen von 0 bis 2. Ein Zug ändert das Spielfeld nicht, sondern
+ * {@link #with(int, int, Symbol)} liefert ein neues. Dazu kommen einfache Hilfsmethoden für die Spiellogik
+ * (Gewinn- und Vollprüfung) und die Konsolenausgabe.
  *
- * @param cells Inhalt der Felder als {@code cells.get(zeile).get(spalte)}; freie Felder sind {@link Symbol#EMPTY}
+ * @param cells Felder als {@code cells.get(zeile).get(spalte)}; freie Felder sind {@link Symbol#EMPTY}
  */
 public record Board(List<List<Symbol>> cells) {
-    /** Kantenlaenge des Spielfelds. */
+    /** Kantenlänge des Spielfelds. */
     public static final int SIZE = 3;
 
     /**
-     * Prueft die Groesse (3x3) und speichert die Felder als unveraenderliche Kopie.
+     * Prüft die Größe (3x3) und speichert die Felder als unveränderliche Kopie.
      * Greift auch beim Unmarshalling, ein fehlerhaftes Spielfeld aus dem Netz wird also abgelehnt.
      *
-     * @param cells Inhalt der Felder, zeilenweise
+     * @param cells Felder, zeilenweise
      * @throws IllegalArgumentException wenn das Spielfeld nicht 3x3 Felder hat
-     * @throws NullPointerException     wenn ein Feld {@code null} ist
      */
     public Board {
         if (cells == null || cells.size() != SIZE || cells.stream().anyMatch(row -> row == null || row.size() != SIZE))
@@ -33,7 +30,7 @@ public record Board(List<List<Symbol>> cells) {
         cells = cells.stream().map(List::copyOf).toList();
     }
 
-    /** Erzeugt ein leeres Spielfeld, in dem alle Felder {@link Symbol#EMPTY} sind. */
+    /** Erzeugt ein leeres Spielfeld. */
     public Board() { this(Collections.nCopies(SIZE, Collections.nCopies(SIZE, Symbol.EMPTY))); }
 
     /**
@@ -46,13 +43,13 @@ public record Board(List<List<Symbol>> cells) {
     public Symbol get(int r, int c) { return cells.get(r).get(c); }
 
     /**
-     * Liefert ein neues Spielfeld, in dem ein Feld geaendert ist; dieses Spielfeld bleibt unveraendert.
-     * Regeln werden nicht geprueft, das uebernimmt {@link tictactoe.game.Game}.
+     * Liefert ein neues Spielfeld mit einem gesetzten Feld; dieses Spielfeld bleibt unverändert.
+     * Regeln prüft erst {@link tictactoe.game.Game}.
      *
      * @param r Zeile (0 bis 2)
      * @param c Spalte (0 bis 2)
      * @param s zu setzendes Symbol
-     * @return neues Spielfeld mit dem gesetzten Symbol
+     * @return neues Spielfeld
      */
     public Board with(int r, int c, Symbol s) {
         List<List<Symbol>> rows = new ArrayList<>();
@@ -62,18 +59,18 @@ public record Board(List<List<Symbol>> cells) {
     }
 
     /**
-     * Prueft, ob eine Position innerhalb des Spielfelds liegt.
+     * Prüft, ob eine Position im Spielfeld liegt.
      *
      * @param r Zeile
      * @param c Spalte
-     * @return {@code true}, wenn Zeile und Spalte jeweils zwischen 0 und {@code SIZE - 1} liegen
+     * @return {@code true}, wenn Zeile und Spalte jeweils zwischen 0 und 2 liegen
      */
     public boolean inBounds(int r, int c) { return r >= 0 && r < SIZE && c >= 0 && c < SIZE; }
 
     /**
-     * Prueft, ob kein Feld mehr frei ist.
+     * Prüft, ob kein Feld mehr frei ist.
      *
-     * @return {@code true}, wenn alle Felder belegt sind (ohne Gewinner bedeutet das Unentschieden)
+     * @return {@code true}, wenn alle Felder belegt sind
      */
     public boolean isFull() {
         for (List<Symbol> row : cells) if (row.contains(Symbol.EMPTY)) return false;
@@ -81,9 +78,9 @@ public record Board(List<List<Symbol>> cells) {
     }
 
     /**
-     * Ermittelt den Gewinner, indem alle Zeilen, Spalten und beide Diagonalen auf drei gleiche Symbole geprueft werden.
+     * Sucht drei gleiche Symbole in einer Zeile, Spalte oder Diagonale.
      *
-     * @return Symbol mit drei in einer Reihe ({@link Symbol#X} oder {@link Symbol#O}) oder {@code null}
+     * @return {@link Symbol#X} oder {@link Symbol#O} bei drei in einer Reihe, sonst {@code null}
      */
     public Symbol winner() {
         for (int i = 0; i < SIZE; i++) {
@@ -95,20 +92,13 @@ public record Board(List<List<Symbol>> cells) {
         return null;
     }
 
-    /**
-     * Prueft, ob drei Felder dasselbe, nicht leere Symbol enthalten.
-     *
-     * @param a erstes Feld
-     * @param b zweites Feld
-     * @param c drittes Feld
-     * @return {@code true} bei drei gleichen Symbolen ungleich {@link Symbol#EMPTY}
-     */
+    /** Drei gleiche, nicht leere Symbole? */
     private static boolean line(Symbol a, Symbol b, Symbol c) { return a != Symbol.EMPTY && a == b && b == c; }
 
     /**
-     * Stellt das Spielfeld fuer die Konsole dar, mit Zeilen- und Spaltennummern.
+     * Stellt das Spielfeld mit Zeilen- und Spaltennummern für die Konsole dar.
      *
-     * @return mehrzeilige Textdarstellung des Spielfelds
+     * @return mehrzeilige Textdarstellung
      */
     @Override public String toString() {
         StringBuilder sb = new StringBuilder("    0   1   2\n");

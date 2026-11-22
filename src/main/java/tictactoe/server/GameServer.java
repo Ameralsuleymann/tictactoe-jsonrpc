@@ -1,33 +1,27 @@
 package tictactoe.server;
 
+import java.io.IOException;
 import java.net.*;
 import java.util.Collections;
-import tictactoe.api.GameService;
 import tictactoe.game.Game;
-import tictactoe.rpc.RpcPeer;
+import tictactoe.rpc.*;
 
 /**
- * Startklasse des Servers der verteilten Version (Phase 2).
+ * Startklasse des Servers der verteilten Version.
  *
- * <p>Lauscht auf einem TCP-Port und erzeugt fuer jeden verbundenen Client einen eigenen {@link RpcPeer} mit einer
- * {@link GameSession}, die als Dienst {@code "game"} registriert wird. Alle Sessions teilen sich eine
- * {@link Game}-Instanz.
+ * <p>Ein {@link Game} für alle Clients. Pro Verbindung entstehen ein {@link RpcPeer}, ein {@link GameListenerStub}
+ * (Server &rarr; Client), eine {@link GameSession} und ein {@link GameServiceSkeleton} (Client &rarr; Server).
  *
- * <p>Start: {@code java -cp ... tictactoe.server.GameServer [port]}; mit {@code -Drpc.verbose=true} werden die
- * JSON-Nachrichten angezeigt.<br>
- * Laeuft dauerhaft: nach Spielende geht es mit {@code neu} weiter, getrennte Clients geben ihren Platz frei.
+ * <p>Start: {@code GameServer [port]}; mit {@code -Drpc.verbose=true} werden alle JSON-Nachrichten angezeigt.
  */
 public class GameServer {
-    /** Standardkonstruktor; der Server wird ueber {@link #main(String[])} gestartet. */
-    public GameServer() { }
-
     /**
-     * Startet den Server, gibt seine erreichbaren Adressen aus und nimmt in einer Endlosschleife Verbindungen an.
+     * Startet den Server und nimmt in einer Endlosschleife Verbindungen an.
      *
-     * @param args optional {@code [port]}, Standard ist {@code 5000}
-     * @throws Exception wenn der Port nicht geoeffnet werden kann oder ein Ein-/Ausgabefehler auftritt
+     * @param args optional {@code [port]}, Standard ist 5000
+     * @throws IOException wenn der Port nicht geöffnet werden kann
      */
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 5000;
         boolean verbose = Boolean.getBoolean("rpc.verbose");
         Game game = new Game();
@@ -38,26 +32,21 @@ public class GameServer {
                 Socket socket = server.accept();
                 System.out.println("Client verbunden: " + socket.getRemoteSocketAddress());
                 RpcPeer peer = new RpcPeer(socket, verbose);
-                peer.register("game", GameService.class, new GameSession(game, peer));
+                GameSession session = new GameSession(game, new GameListenerStub(peer));  // Server -> Client
+                peer.setSkeleton(new GameServiceSkeleton(session));                        // Client -> Server
+                peer.onClose(session::leave);
                 peer.start();
             }
         }
     }
 
-    /**
-     * Gibt die IPv4-Adressen dieses Rechners aus, die Clients bei "Server-IP" eingeben koennen.
-     * Beruecksichtigt werden alle aktiven Netzwerkschnittstellen ohne Loopback, z.B. Hamachi mit {@code 25.x.x.x}.
-     */
-    private static void printAddresses() {
-        try {
-            System.out.println("Erreichbar unter:");
-            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-                if (!ni.isUp() || ni.isLoopback()) continue;
-                for (InetAddress a : Collections.list(ni.getInetAddresses()))
-                    if (a instanceof Inet4Address) System.out.println("  " + a.getHostAddress() + "  (" + ni.getDisplayName() + ")");
-            }
-        } catch (SocketException e) {
-            System.out.println("  (Adressen nicht ermittelbar: " + e.getMessage() + ")");
+    /** Gibt die IPv4-Adressen dieses Rechners aus, die Clients als Server-IP eingeben können. */
+    private static void printAddresses() throws SocketException {
+        System.out.println("Erreichbar unter:");
+        for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+            if (!ni.isUp() || ni.isLoopback()) continue;
+            for (InetAddress a : Collections.list(ni.getInetAddresses()))
+                if (a instanceof Inet4Address) System.out.println("  " + a.getHostAddress() + "  (" + ni.getDisplayName() + ")");
         }
     }
 }

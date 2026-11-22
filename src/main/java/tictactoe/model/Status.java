@@ -1,15 +1,13 @@
 package tictactoe.model;
 
-/**
- * Status einer Spielrunde; Teil von {@link GameState}.
- */
+/** Status einer Spielrunde; Teil von {@link GameState}. */
 public enum Status {
-    /** Es sind noch nicht zwei Spieler angemeldet; Zuege sind nicht moeglich. */
+    /** Noch keine zwei Spieler angemeldet; Züge sind nicht möglich. */
     WAITING,
-    /** Die Runde laeuft; der Spieler mit {@link GameState#current()} ist am Zug. */
+    /** Die Runde läuft; der Spieler mit {@link GameState#current()} ist am Zug. */
     RUNNING,
-    /** Die Runde ist mit einem Gewinner beendet. */
+    /** Die Runde ist entschieden; {@link GameState#current()} ist der Gewinner. */
     WON,
-    /** Die Runde ist unentschieden beendet, das Spielfeld ist voll. */
+    /** Unentschieden, das Spielfeld ist voll. */
     DRAW
 }

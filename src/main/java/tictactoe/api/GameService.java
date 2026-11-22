@@ -1,56 +1,42 @@
 package tictactoe.api;
 
-import tictactoe.model.GameState;
 import tictactoe.model.Move;
 import tictactoe.model.Player;
 
 /**
- * Fassade zum Spiel; in der verteilten Version der C-S-Contract in Richtung Client &rarr; Server.
+ * Contract Client &rarr; Server: alles, was ein Spieler am Spiel tun kann.
  *
  * <p>Implementierungen:
  * <ul>
- *   <li>{@link tictactoe.game.Game} &ndash; die Spiellogik selbst (lokal im Prozess oder auf dem Server),</li>
- *   <li>{@link tictactoe.server.GameSession} &ndash; serverseitiger Endpunkt je Client, delegiert an {@code Game},</li>
- *   <li>der Stub aus {@link tictactoe.rpc.RpcPeer#proxy(String, Class)} &ndash; leitet Aufrufe per JSON-RPC
- *       an den Server weiter.</li>
+ *   <li>{@link tictactoe.game.Game}: die Spiellogik (lokal oder auf dem Server),</li>
+ *   <li>{@link tictactoe.server.GameSession}: serverseitig ein Objekt pro Client, leitet an {@code Game} weiter,</li>
+ *   <li>{@link tictactoe.rpc.GameServiceStub}: clientseitiger Stub, schickt jeden Aufruf zum Server.</li>
  * </ul>
- * Da lokale und entfernte Aufrufe ueber dieselbe Schnittstelle laufen, ist Zugriffstransparenz gegeben.
- * Parameter und Rueckgabewerte sind DTOs aus {@link tictactoe.model} und werden per Wert (als Kopie) uebertragen.
- *
- * @see GameListener
+ * Jede Methode hat höchstens ein Argument und liefert nichts zurück. Den neuen Spielzustand erfahren die Clients
+ * ausschließlich über {@link GameListener#onStateChanged}.
  */
 public interface GameService {
     /**
-     * Meldet einen Spieler an; liefert ihn mit zugewiesenem Symbol zurueck.
+     * Meldet einen Spieler an; das Symbol (X oder O) vergibt das Spiel.
      *
-     * <p>Der Spieler erhaelt das freie Symbol (zuerst {@link tictactoe.model.Symbol#X}, dann
-     * {@link tictactoe.model.Symbol#O}). Mit dem zweiten Spieler beginnt die Runde.
-     *
-     * @param player anzumeldender Spieler; ausgewertet wird nur der Name
-     * @return neue Instanz des Spielers mit zugewiesenem Symbol
-     * @throws GameException wenn der Name fehlt oder schon vergeben ist oder bereits zwei Spieler angemeldet sind
+     * @param player anzumeldender Spieler, ausgewertet wird nur der Name
+     * @throws GameException wenn der Name fehlt oder vergeben ist oder schon zwei Spieler angemeldet sind
      */
-    Player join(Player player) throws GameException;
+    void join(Player player) throws GameException;
 
     /**
-     * Fuehrt einen Zug aus, nachdem alle Spielregeln geprueft wurden.
+     * Führt einen Zug aus, wenn er nach den Spielregeln erlaubt ist.
      *
-     * @param move der Zug (Spieler, Zeile und Spalte jeweils 0 bis 2)
-     * @return der Spielzustand nach dem Zug
-     * @throws GameException wenn das Spiel nicht laeuft, der Spieler unbekannt oder nicht am Zug ist oder das Feld
-     *                       ausserhalb des Spielfelds liegt bzw. bereits belegt ist
+     * @param move Spieler, Zeile und Spalte (jeweils 0 bis 2)
+     * @throws GameException wenn die Runde nicht läuft, der Spieler nicht am Zug ist oder das Feld ungültig oder
+     *                       belegt ist
      */
-    GameState makeMove(Move move) throws GameException;
+    void makeMove(Move move) throws GameException;
 
     /**
-     * Liefert den aktuellen Spielzustand.
+     * Startet die Runde neu (auch nach Spielende); die Spieler bleiben angemeldet.
      *
-     * @return Kopie des aktuellen Spielzustands
+     * @throws GameException wenn noch keine zwei Spieler angemeldet sind
      */
-    GameState getState();
-
-    /**
-     * Startet die laufende Runde neu oder beginnt nach Spielende eine neue Runde; die Spieler bleiben angemeldet.
-     */
-    void reset();
+    void reset() throws GameException;
 }
