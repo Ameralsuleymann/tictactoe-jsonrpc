@@ -2,8 +2,7 @@
   <configuration default="false" name="Server (Phase 2)" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="tictactoe.server.GameServer" />
     <module name="tictactoe-jsonrpc" />
-    <option name="PROGRAM_PARAMETERS" value="5000" />
-    <option name="VM_PARAMETERS" value="-Drpc.verbose=true" />
+    <option name="PROGRAM_PARAMETERS" value="localhost" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>

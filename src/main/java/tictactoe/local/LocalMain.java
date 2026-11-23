@@ -21,9 +21,8 @@ public class LocalMain {
      * Meldet Alice und Bob an und liest dann Züge und Befehle von der Konsole.
      *
      * @param args wird nicht ausgewertet
-     * @throws GameException wenn die Anmeldung der beiden Spieler scheitert
      */
-    public static void main(String[] args) throws GameException {
+    public static void main(String[] args) {
         Game game = new Game();
         game.addListener(new ConsoleListener());     // Anzeige
         game.addListener(s -> state = s);             // merkt sich den Zustand, wie jeder andere Beobachter

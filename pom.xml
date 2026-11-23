@@ -7,7 +7,7 @@
     <groupId>de.haw.vsp</groupId>
     <artifactId>tictactoe-jsonrpc</artifactId>
     <version>1.0</version>
-    <name>TicTacToe JSON-RPC (AI-VSP Praktikum 1)</name>
+    <name>TicTacToe JMS (AI-VSP Praktikum 2)</name>
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
@@ -20,6 +20,18 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.13.1</version>
+        </dependency>
+        <!-- JMS-Client fuer den Message-Broker ActiveMQ (gleiche Version wie Broker und Kursbeispiel) -->
+        <dependency>
+            <groupId>org.apache.activemq</groupId>
+            <artifactId>activemq-client</artifactId>
+            <version>5.15.12</version>
+        </dependency>
+        <!-- unterdrueckt die SLF4J-Warnung des ActiveMQ-Clients -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>1.7.25</version>
         </dependency>
     </dependencies>
 

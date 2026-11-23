@@ -3,13 +3,11 @@ package tictactoe.api;
 /**
  * Fachlicher Fehler des Spiels, z.B. ein belegtes Feld oder ein Spieler, der nicht am Zug ist.
  *
- * <p>Checked Exception, deklariert in allen Methoden von {@link GameService}. Verteilt schickt der Server sie als
- * JSON-RPC-{@code error} mit dem Klassennamen; der {@link tictactoe.rpc.GameServiceStub} erzeugt sie beim Client neu
- * und wirft sie dort.
- *
- * @see tictactoe.rpc.RpcException
+ * <p>Unchecked, weil der Contract fire-and-forget ist und keine {@code throws} hat. Lokal fängt
+ * {@link tictactoe.local.LocalMain} sie direkt. Verteilt fängt sie der {@link tictactoe.rpc.GameServiceSkeleton} und
+ * schickt die Meldung als {@link GameListener#onError} an den Absender.
  */
-public class GameException extends Exception {
+public class GameException extends RuntimeException {
     /**
      * Erzeugt einen fachlichen Fehler.
      *

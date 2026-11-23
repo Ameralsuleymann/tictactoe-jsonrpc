@@ -1,52 +1,43 @@
 package tictactoe.server;
 
-import java.io.IOException;
-import java.net.*;
-import java.util.Collections;
+import java.util.Scanner;
+import javax.jms.JMSException;
+import tictactoe.clock.VectorClock;
 import tictactoe.game.Game;
 import tictactoe.rpc.*;
+import tictactoe.ui.ConsoleListener;
 
 /**
- * Startklasse des Servers der verteilten Version.
+ * Startklasse des Servers: verbindet sich mit dem Broker und verarbeitet die Nachrichten der Queue
+ * {@value JmsPeer#REQUESTS}.
  *
- * <p>Ein {@link Game} für alle Clients. Pro Verbindung entstehen ein {@link RpcPeer}, ein {@link GameListenerStub}
- * (Server &rarr; Client), eine {@link GameSession} und ein {@link GameServiceSkeleton} (Client &rarr; Server).
+ * <p>Am {@link Game} hängen drei Beobachter, in dieser Reihenfolge: die {@link LagCompensation} (merkt sich jeden
+ * Zustand fürs Zurückspulen), ein {@link ConsoleListener} (der Server zeigt jeden neuen Zustand an) und ein
+ * {@link GameListenerStub} für das Topic {@value JmsPeer#STATE} (der Zustand geht an alle Clients).
  *
- * <p>Start: {@code GameServer [port]}; mit {@code -Drpc.verbose=true} werden alle JSON-Nachrichten angezeigt.
+ * <p>Start: {@code GameServer [broker-host]}, Standard ist {@code localhost}. Beenden mit {@code q}.
  */
 public class GameServer {
     /**
-     * Startet den Server und nimmt in einer Endlosschleife Verbindungen an.
+     * Startet den Server.
      *
-     * @param args optional {@code [port]}, Standard ist 5000
-     * @throws IOException wenn der Port nicht geöffnet werden kann
+     * @param args optional {@code [broker-host]}
+     * @throws JMSException wenn der Broker nicht erreichbar ist
      */
-    public static void main(String[] args) throws IOException {
-        int port = args.length > 0 ? Integer.parseInt(args[0]) : 5000;
-        boolean verbose = Boolean.getBoolean("rpc.verbose");
+    public static void main(String[] args) throws JMSException {
+        String broker = args.length > 0 ? args[0] : "localhost";
+        JmsPeer peer = new JmsPeer(broker, VectorClock.SERVER);
         Game game = new Game();
-        try (ServerSocket server = new ServerSocket(port)) {
-            System.out.println("TicTacToe-Server lauscht auf Port " + port + " (beenden mit Strg+C)");
-            printAddresses();
-            while (true) {
-                Socket socket = server.accept();
-                System.out.println("Client verbunden: " + socket.getRemoteSocketAddress());
-                RpcPeer peer = new RpcPeer(socket, verbose);
-                GameSession session = new GameSession(game, new GameListenerStub(peer));  // Server -> Client
-                peer.setSkeleton(new GameServiceSkeleton(session));                        // Client -> Server
-                peer.onClose(session::leave);
-                peer.start();
-            }
-        }
-    }
+        LagCompensation lagCompensation = new LagCompensation(game, peer.clock());
+        game.addListener(lagCompensation);                                         // 1. Zeitleiste
+        game.addListener(new ConsoleListener());                                   // 2. Anzeige auf dem Server
+        game.addListener(new GameListenerStub(peer, peer.topic(JmsPeer.STATE)));   // 3. an alle Clients
+        peer.listen(peer.queue(JmsPeer.REQUESTS), new GameServiceSkeleton(game, lagCompensation, peer));
+        System.out.println("TicTacToe-Server ist mit dem Broker " + broker + " verbunden und wartet auf "
+                + JmsPeer.REQUESTS + " (beenden mit q)");
 
-    /** Gibt die IPv4-Adressen dieses Rechners aus, die Clients als Server-IP eingeben können. */
-    private static void printAddresses() throws SocketException {
-        System.out.println("Erreichbar unter:");
-        for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-            if (!ni.isUp() || ni.isLoopback()) continue;
-            for (InetAddress a : Collections.list(ni.getInetAddresses()))
-                if (a instanceof Inet4Address) System.out.println("  " + a.getHostAddress() + "  (" + ni.getDisplayName() + ")");
-        }
+        Scanner in = new Scanner(System.in);
+        while (in.hasNextLine()) if (in.nextLine().trim().equalsIgnoreCase("q")) break;
+        peer.close();
     }
 }
